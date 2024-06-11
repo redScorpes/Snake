@@ -1,6 +1,7 @@
 use std::cmp::PartialEq;
 use std::time::{Duration, Instant};
 use macroquad::prelude::*;
+use crate::Direction::{Down, Left, Right, Up};
 
 const BOARD_WIDTH: usize = 10;
 const BOARD_HEIGHT: usize = 10;
@@ -37,7 +38,8 @@ struct Snake {
     segments: Segments,
     has_eaten: bool,
     tail_position: Vec2,
-    score: i32
+    score: i32,
+    previous_direction_inverted: Direction
 }
 
 impl Snake {
@@ -60,6 +62,8 @@ impl Snake {
 
         let score = 0;
 
+        let mut previous_direction_inverted = Direction::Left;
+
         Snake {
             name: String::from("snake"),
             is_alive: true,
@@ -71,10 +75,11 @@ impl Snake {
             position,
             matrix_position,
             facing: Direction::Right,
-            segments: segments,
+            segments,
             has_eaten,
             tail_position,
             score,
+            previous_direction_inverted
         }
     }
 
@@ -102,6 +107,15 @@ impl Snake {
         }
         false
     }
+
+    fn is_on_snake(&self, position: Vec2) -> bool {
+        for segment in &self.segments {
+            if *segment == position {
+                return true;
+            }
+        }
+        false
+    }
 }
 
 struct Apple {
@@ -112,10 +126,16 @@ struct Apple {
 }
 
 impl Apple {
-    async fn new() -> Apple {
+    async fn new(snake: &Snake) -> Apple {
         let apple_img = load_texture("assets/apple.png").await.expect("Failed to load snake head image");
 
-        let matrix_position = Vec2::new(rand::gen_range(1,10) as f32, rand::gen_range(1,10) as f32);
+        let mut matrix_position;
+        loop {
+            matrix_position = Vec2::new(rand::gen_range(1, 10) as f32, rand::gen_range(1, 10) as f32);
+            if !snake.is_on_snake(matrix_position) {
+                break;
+            }
+        }
         let position = matrix_position * Vec2::new(50.0, 50.0);
 
         Apple {
@@ -138,7 +158,11 @@ async fn main() {
 
     let mut snake = Snake::new().await;
 
-    let mut apple = Apple::new().await;
+    let mut apple = Apple::new(&snake).await;
+
+    let mut game_over = false;
+
+    let mut high_score = 0;
 
     let mut board: [[char; BOARD_WIDTH]; BOARD_HEIGHT] = [[' '; BOARD_WIDTH]; BOARD_HEIGHT];
 
@@ -146,83 +170,111 @@ async fn main() {
 
     loop {
 
-        if is_key_pressed(KeyCode::S){
-            snake.facing = Direction::Down;
-        }
-        if is_key_pressed(KeyCode::W){
-            snake.facing = Direction::Up;
-        }
-        if is_key_pressed(KeyCode::A){
-            snake.facing = Direction::Left;
-        }
-        if is_key_pressed(KeyCode::D){
-            snake.facing = Direction::Right;
-        }
-
-        if Instant::now() - last_update >= Duration::from_secs_f32(0.5 * snake.speed) {
-            let now = Instant::now();
-            last_update = now;
-
-            let mut new_head = snake.segments[0];
-
-            match snake.facing {
-                Direction::Down => new_head.y += 1.0,
-                Direction::Up => new_head.y -= 1.0,
-                Direction::Left => new_head.x -= 1.0,
-                Direction::Right => new_head.x += 1.0,
+        if !game_over {
+            if is_key_pressed(KeyCode::S) && snake.previous_direction_inverted != Direction::Down && snake.facing != Direction::Down {
+                snake.facing = Direction::Down;
+            }
+            if is_key_pressed(KeyCode::W) && snake.previous_direction_inverted != Direction::Up && snake.facing != Direction::Up {
+                snake.facing = Direction::Up;
+            }
+            if is_key_pressed(KeyCode::A) && snake.previous_direction_inverted != Direction::Left && snake.facing != Direction::Left {
+                snake.facing = Direction::Left;
+            }
+            if is_key_pressed(KeyCode::D) && snake.previous_direction_inverted != Direction::Right && snake.facing != Direction::Right {
+                snake.facing = Direction::Right;
             }
 
-            snake.segments.insert(0, new_head);
-            snake.position = new_head * Vec2::new(50.0, 50.0);
-            if snake.score > 0 {
-                snake.tail_position = *snake.segments.last().unwrap() * Vec2::new(50.0, 50.0);
+            if Instant::now() - last_update >= Duration::from_secs_f32(0.5 * snake.speed) {
+                let now = Instant::now();
+                last_update = now;
+
+                let mut new_head = snake.segments[0];
+
+                match snake.facing {
+                    Direction::Down => snake.previous_direction_inverted = Up,
+                    Direction::Up => snake.previous_direction_inverted = Down,
+                    Direction::Left => snake.previous_direction_inverted = Right,
+                    Direction::Right => snake.previous_direction_inverted = Left,
+                }
+
+                match snake.facing {
+                    Direction::Down => new_head.y += 1.0,
+                    Direction::Up => new_head.y -= 1.0,
+                    Direction::Left => new_head.x -= 1.0,
+                    Direction::Right => new_head.x += 1.0,
+                }
+
+                snake.segments.insert(0, new_head);
+                snake.position = new_head * Vec2::new(50.0, 50.0);
+                if snake.score > 0 {
+                    snake.tail_position = *snake.segments.last().unwrap() * Vec2::new(50.0, 50.0);
+                }
+
+                if !snake.has_eaten {
+                    snake.segments.pop();
+                } else {
+                    snake.has_eaten = false;
+                }
             }
 
-            if !snake.has_eaten {
-                snake.segments.pop();
-            } else {
-                snake.has_eaten = false;
+            if apple.matrix_position == snake.segments[0] {
+                apple = Apple::new(&snake).await;
+                snake.length += 1;
+                snake.score += 1;
+                snake.speed -= 0.05;
+                snake.has_eaten = true;
+            }
+
+            if snake.is_out_of_bounds() {
+                println!("Snake is out of bounds!");
+                game_over = true; // Exit the loop if snake is out of bounds
+            }
+
+            if snake.is_colliding_with_itself() {
+                println!("Snake ate itself!");
+                game_over = true;
+            }
+
+            clear_background(GRAY);
+
+            draw_texture(&background_image, 0.0, 0.0, WHITE);
+
+            board[snake.segments[0].x as usize][snake.segments[0].y as usize] = 's';
+
+            for row in 0..BOARD_WIDTH {
+                for col in 0..BOARD_HEIGHT {
+                    print!("{}", board[col][row]);
+                }
+                println!();
+            }
+
+            apple.draw();
+
+            snake.draw();
+
+            draw_text(format!("Score: {}", snake.score).as_str(), 10.0, 20.0, 25.0, BLACK);
+
+        } else {
+
+            clear_background(GRAY);
+
+            draw_texture(&background_image, 0.0, 0.0, WHITE);
+
+            if snake.score > high_score {
+                high_score = snake.score;
+            }
+
+            draw_text("You Died!", 40.0, 150.0, 110.0, RED);
+            draw_text(format!("Your score is: {}", snake.score).as_str(), 70.0, 250.0, 50.0, BLACK);
+            draw_text(format!("Your high score is: {}", high_score).as_str(),  35.0, 300.0, 50.0, BLACK);
+            draw_text("Press 'Space' to play again",  45.0, 335.0, 35.0, DARKGRAY);
+
+            if is_key_down(KeyCode::Space) {
+                snake = Snake::new().await;
+                apple = Apple::new(&snake).await;
+                game_over = false;
             }
         }
-
-        if apple.matrix_position == snake.segments[0] {
-            apple.matrix_position = Vec2::new(rand::gen_range(1,10) as f32, rand::gen_range(1,10) as f32);
-            apple.position = apple.matrix_position * Vec2::new(50.0, 50.0);
-            snake.length += 1;
-            snake.score += 1;
-            snake.speed -= 0.05;
-            snake.has_eaten = true;
-        }
-
-        if snake.is_out_of_bounds() {
-            println!("Snake is out of bounds!");
-            break; // Exit the loop if snake is out of bounds
-        }
-
-        if snake.is_colliding_with_itself() {
-            println!("Snake ate itself!");
-            break;
-        }
-
-        clear_background(GRAY);
-
-        draw_texture(&background_image, 0.0, 0.0, WHITE);
-
-        board[snake.segments[0].x as usize][snake.segments[0].y as usize] = 's';
-
-        for row in 0..BOARD_WIDTH {
-            for col in 0..BOARD_HEIGHT {
-                print!("{}", board[col][row]);
-            }
-            println!();
-        }
-
-        apple.draw();
-
-        snake.draw();
-
-        draw_text(format!("Score: {}", snake.score).as_str(), 10.0, 20.0, 25.0, BLACK);
-
         next_frame().await
     }
 }
