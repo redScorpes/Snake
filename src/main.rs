@@ -25,15 +25,12 @@ enum Direction {
 type Segments = Vec<Vec2>;
 
 struct Snake {
-    name: String,
-    is_alive: bool,
     length: i32,
     speed: f32,
     head_img: Texture2D,
     body_img: Texture2D,
     tail_img: Texture2D,
     position: Vec2,
-    matrix_position: Vec2,
     facing: Direction,
     segments: Segments,
     has_eaten: bool,
@@ -62,19 +59,16 @@ impl Snake {
 
         let score = 0;
 
-        let mut previous_direction_inverted = Direction::Left;
+        let previous_direction_inverted = Left;
 
         Snake {
-            name: String::from("snake"),
-            is_alive: true,
             length: 1,
             speed,
             head_img,
             body_img,
             tail_img,
             position,
-            matrix_position,
-            facing: Direction::Right,
+            facing: Right,
             segments,
             has_eaten,
             tail_position,
@@ -122,7 +116,6 @@ struct Apple {
     apple_img: Texture2D,
     position: Vec2,
     matrix_position: Vec2,
-    collected: bool,
 }
 
 impl Apple {
@@ -142,7 +135,6 @@ impl Apple {
             apple_img,
             position,
             matrix_position,
-            collected: false,
         }
     }
     fn draw(&self) {
@@ -171,17 +163,17 @@ async fn main() {
     loop {
 
         if !game_over {
-            if is_key_pressed(KeyCode::S) && snake.previous_direction_inverted != Direction::Down && snake.facing != Direction::Down {
-                snake.facing = Direction::Down;
+            if is_key_pressed(KeyCode::S) && snake.previous_direction_inverted != Down && snake.facing != Down {
+                snake.facing = Down;
             }
-            if is_key_pressed(KeyCode::W) && snake.previous_direction_inverted != Direction::Up && snake.facing != Direction::Up {
-                snake.facing = Direction::Up;
+            if is_key_pressed(KeyCode::W) && snake.previous_direction_inverted != Up && snake.facing != Up {
+                snake.facing = Up;
             }
-            if is_key_pressed(KeyCode::A) && snake.previous_direction_inverted != Direction::Left && snake.facing != Direction::Left {
-                snake.facing = Direction::Left;
+            if is_key_pressed(KeyCode::A) && snake.previous_direction_inverted != Left && snake.facing != Left {
+                snake.facing = Left;
             }
-            if is_key_pressed(KeyCode::D) && snake.previous_direction_inverted != Direction::Right && snake.facing != Direction::Right {
-                snake.facing = Direction::Right;
+            if is_key_pressed(KeyCode::D) && snake.previous_direction_inverted != Right && snake.facing != Right {
+                snake.facing = Right;
             }
 
             if Instant::now() - last_update >= Duration::from_secs_f32(0.5 * snake.speed) {
@@ -191,17 +183,17 @@ async fn main() {
                 let mut new_head = snake.segments[0];
 
                 match snake.facing {
-                    Direction::Down => snake.previous_direction_inverted = Up,
-                    Direction::Up => snake.previous_direction_inverted = Down,
-                    Direction::Left => snake.previous_direction_inverted = Right,
-                    Direction::Right => snake.previous_direction_inverted = Left,
+                    Down => snake.previous_direction_inverted = Up,
+                    Up => snake.previous_direction_inverted = Down,
+                    Left => snake.previous_direction_inverted = Right,
+                    Right => snake.previous_direction_inverted = Left,
                 }
 
                 match snake.facing {
-                    Direction::Down => new_head.y += 1.0,
-                    Direction::Up => new_head.y -= 1.0,
-                    Direction::Left => new_head.x -= 1.0,
-                    Direction::Right => new_head.x += 1.0,
+                    Down => new_head.y += 1.0,
+                    Up => new_head.y -= 1.0,
+                    Left => new_head.x -= 1.0,
+                    Right => new_head.x += 1.0,
                 }
 
                 snake.segments.insert(0, new_head);
