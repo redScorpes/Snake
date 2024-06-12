@@ -196,35 +196,41 @@ async fn main() {
                     Right => new_head.x += 1.0,
                 }
 
-                snake.segments.insert(0, new_head);
-                snake.position = new_head * Vec2::new(50.0, 50.0);
-                if snake.score > 0 {
-                    snake.tail_position = *snake.segments.last().unwrap() * Vec2::new(50.0, 50.0);
-                }
-
-                if !snake.has_eaten {
-                    snake.segments.pop();
+                if new_head.x < 0.0 || new_head.x >= BOARD_WIDTH as f32 || new_head.y < 0.0 || new_head.y >= BOARD_HEIGHT as f32 {
+                    println!("Snake is out of bounds!");
+                    game_over = true;
                 } else {
-                    snake.has_eaten = false;
+                    snake.segments.insert(0, new_head);
+                    snake.position = new_head * Vec2::new(50.0, 50.0);
+                    if snake.score > 0 {
+                        snake.tail_position = *snake.segments.last().unwrap() * Vec2::new(50.0, 50.0);
+                    }
+
+                    if !snake.has_eaten {
+                        snake.segments.pop();
+                    } else {
+                        snake.has_eaten = false;
+                    }
+
+
+                    if apple.matrix_position == snake.segments[0] {
+                        apple = Apple::new(&snake).await;
+                        snake.length += 1;
+                        snake.score += 1;
+                        snake.speed -= 0.05;
+                        snake.has_eaten = true;
+                    }
+
+                    if snake.is_out_of_bounds() {
+                        println!("Snake is out of bounds!");
+                        game_over = true; // Exit the loop if snake is out of bounds
+                    }
+
+                    if snake.is_colliding_with_itself() {
+                        println!("Snake ate itself!");
+                        game_over = true;
+                    }
                 }
-            }
-
-            if apple.matrix_position == snake.segments[0] {
-                apple = Apple::new(&snake).await;
-                snake.length += 1;
-                snake.score += 1;
-                snake.speed -= 0.05;
-                snake.has_eaten = true;
-            }
-
-            if snake.is_out_of_bounds() {
-                println!("Snake is out of bounds!");
-                game_over = true; // Exit the loop if snake is out of bounds
-            }
-
-            if snake.is_colliding_with_itself() {
-                println!("Snake ate itself!");
-                game_over = true;
             }
 
             clear_background(GRAY);
