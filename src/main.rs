@@ -2,9 +2,32 @@ use std::cmp::PartialEq;
 use std::time::{Duration, Instant};
 use macroquad::prelude::*;
 use crate::Direction::{Down, Left, Right, Up};
+use std::fs::{File};
+use std::io::{self, Write, Read};
+use std::path::Path;
 
 const BOARD_WIDTH: usize = 10;
 const BOARD_HEIGHT: usize = 10;
+const HIGH_SCORE_FILE: &str = "high_score.txt";
+
+
+fn save_high_score(high_score: i32) -> io::Result<()> {
+    let mut file = File::create(HIGH_SCORE_FILE)?;
+    file.write_all(high_score.to_string().as_bytes())?;
+    Ok(())
+}
+
+fn load_high_score() -> i32 {
+    if Path::new(HIGH_SCORE_FILE).exists() {
+        let mut file = File::open(HIGH_SCORE_FILE).expect("Failed to open high score file");
+        let mut contents = String::new();
+        file.read_to_string(&mut contents).expect("Failed to read high score file");
+        contents.trim().parse().unwrap_or(0)
+    } else {
+        0
+    }
+}
+
 
 fn conf() -> Conf {
     let mut window_conf = Conf::default();
@@ -58,6 +81,8 @@ impl Snake {
         let has_eaten = false;
 
         let score = 0;
+
+        let _high_score = load_high_score();
 
         let previous_direction_inverted = Left;
 
@@ -154,7 +179,7 @@ async fn main() {
 
     let mut game_over = false;
 
-    let mut high_score = 0;
+    let mut high_score = load_high_score();
 
     let mut board: [[char; BOARD_WIDTH]; BOARD_HEIGHT] = [[' '; BOARD_WIDTH]; BOARD_HEIGHT];
 
@@ -260,11 +285,12 @@ async fn main() {
 
             if snake.score > high_score {
                 high_score = snake.score;
+                save_high_score(high_score).expect("Failed to save high score");
             }
 
             draw_text("You Died!", 40.0, 150.0, 110.0, RED);
             draw_text(format!("Your score is: {}", snake.score).as_str(), 70.0, 250.0, 50.0, BLACK);
-            draw_text(format!("Your high score is: {}", high_score).as_str(),  35.0, 300.0, 50.0, BLACK);
+            draw_text(format!("Your high score is: {}", high_score).as_str(),  20.0, 300.0, 50.0, BLACK);
             draw_text("Press 'Space' to play again",  45.0, 335.0, 35.0, DARKGRAY);
 
             if is_key_down(KeyCode::Space) {
