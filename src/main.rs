@@ -5,15 +5,22 @@ use crate::Direction::{Down, Left, Right, Up};
 use std::fs::{File};
 use std::io::{self, Write, Read};
 use std::path::Path;
+use serde::{Serialize, Deserialize};
 
 const BOARD_WIDTH: usize = 10;
 const BOARD_HEIGHT: usize = 10;
-const HIGH_SCORE_FILE: &str = "high_score.txt";
+const HIGH_SCORE_FILE: &str = "high_score.json";
 
+#[derive(Serialize, Deserialize)]
+struct HighScore{
+    score: i32,
+}
 
 fn save_high_score(high_score: i32) -> io::Result<()> {
+    let high_score = HighScore { score: high_score };
+    let json = serde_json::to_string(&high_score)?;
     let mut file = File::create(HIGH_SCORE_FILE)?;
-    file.write_all(high_score.to_string().as_bytes())?;
+    file.write_all(json.as_bytes())?;
     Ok(())
 }
 
@@ -22,7 +29,8 @@ fn load_high_score() -> i32 {
         let mut file = File::open(HIGH_SCORE_FILE).expect("Failed to open high score file");
         let mut contents = String::new();
         file.read_to_string(&mut contents).expect("Failed to read high score file");
-        contents.trim().parse().unwrap_or(0)
+        let high_score: HighScore = serde_json::from_str(&contents).unwrap_or(HighScore { score: 0 });
+        high_score.score
     } else {
         0
     }
